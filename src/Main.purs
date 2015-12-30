@@ -87,11 +87,9 @@ appStyleSheet = S.createStyleSheet [
     S.flexDirection S.Column
     ],
   S.Style "newTodoContainer" [
-    S.fontSize 18.0,
     S.paddingHorizontal 10.0,
     S.height 56.0,
     S.backgroundColor todoBackgroundColor,
-    S.textDecorationColor fontColorFaded,
     S.borderTopColor borderColor,
     S.borderTopWidth 1.0,
     S.borderBottomColor borderColor,
