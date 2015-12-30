@@ -213,19 +213,34 @@ filterButton ctx activeFilter filter =
           Active -> "Active"
           Completed -> "Completed"
 
-todoRow :: forall a b c d. ReactThis a AppState -> Todo -> b -> c -> d -> ReactElement
-todoRow ctx (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPressFn] $ rowView
+todoRow :: forall b c d. Todo -> b -> c -> d -> ReactElement
+todoRow (Todo id item completed) _ _ _ = touchableHighlight [] $ rowView --[N.onPress onPressFn] $ rowView
   where
     rowView = view [style "todo"] [todoText]
     todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
-    onPressFn _ = transformState ctx (toggleTodoWithId (unsafeLog2 id))
+    -- onPressFn _ = transformState ctx (toggleTodoWithId (unsafeLog2 id))
 
 --render :: forall props eff. Render props AppState eff
 todoList :: forall props eff. T.Spec eff AppState props TodoListAction
 todoList = T.simpleSpec performAction render
   where 
-    render _ _ _ _ = [view [(style "container")] [text [style "title"] "todos"]]
     performAction _ _ _ _ = pure unit
+    render _ _ (AppState state) _ = 
+      [view [(style "container")] $ [
+        text [style "title"] "todos",
+        view [style "newTodoContainer"] [
+          textInput [style "newTodo", 
+                     P.value state.newTodo,
+                     P.placeholder "What needs to be done?"
+                     -- N.onChangeText \newTodo -> transformState ctx (updateNewTodo newTodo),
+                     -- N.onSubmitEditing \_ -> transformState ctx addTodo
+                     ]],
+        listView [style "todoList",
+                  N.renderRow todoRow,
+                  N.renderSeparator todoSeparator,
+                  N.renderHeader $ view [style "separator"] [],
+                  N.dataSource state.dataSource],
+        view [style "bottomBar"] [text [style "clearCompleted"] "Clear completed"]]]
 
 -- do
 --   (AppState state) <- readState ctx
