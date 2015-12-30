@@ -41,6 +41,7 @@ instance eqFilter :: Eq Filter where
   eq Completed Completed = true
   eq _         _         = false
 
+initialTodos :: Array Todo
 initialTodos = [
   Todo 1 "Hack PureScript into Android (using JS mostly)" true,
   Todo 2 "Display text field using purescript-react" true,
@@ -139,10 +140,15 @@ appStyleSheet = S.createStyleSheet [
     ]
   ]
 
+fontColorDefault :: String
 fontColorDefault = "#000000" 
+fontColorFaded :: String
 fontColorFaded = "#D9D9D9" 
+backgroundColor :: String
 backgroundColor = "#F5F5F5"
+todoBackgroundColor :: String
 todoBackgroundColor = "#FFFFFF"
+borderColor :: String
 borderColor = "#EDEDED"
   
 style :: String -> P.Props
@@ -203,6 +209,7 @@ filterButton ctx activeFilter filter =
           Active -> "Active"
           Completed -> "Completed"
 
+todoRow :: forall a b c d. ReactThis a AppState -> Todo -> b -> c -> d -> ReactElement
 todoRow ctx (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPressFn] $ rowView
   where
     rowView = view [style "todo"] [todoText]
