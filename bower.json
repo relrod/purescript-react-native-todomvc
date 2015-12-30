@@ -20,6 +20,7 @@
     "purescript-arrays": "~0.4.2",
     "purescript-integers": "~0.2.1",
     "purescript-maybe": "~0.3.4",
-    "purescript-generics": "~0.6.1"
+    "purescript-generics": "~0.6.1",
+    "purescript-thermite": "~0.12.1"
   }
 }

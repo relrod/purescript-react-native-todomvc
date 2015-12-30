@@ -3,6 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Console (CONSOLE(), log)
+import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Data.Array ((:), concat, filter, findIndex, length, modifyAt, range, sortBy, zip)
 import Data.Generic (Generic, gEq)
 import Data.Int (fromString)
@@ -15,6 +16,7 @@ import ReactNative.Components (ListViewDataSource(), cloneWithRows, listView, li
 import qualified ReactNative.Props as N
 import qualified React.DOM.Props as P
 import qualified ReactNative.Styles as S
+import qualified Thermite as T
 
 data AppState = AppState {
   nextId :: Int, 
@@ -33,6 +35,8 @@ instance eqTodo :: Eq Todo where
 
 getTodoId :: Todo -> Int
 getTodoId (Todo id _ _) = id
+
+data TodoListAction = TodoListAction
   
 data Filter = All | Active | Completed
 instance eqFilter :: Eq Filter where
@@ -216,31 +220,37 @@ todoRow ctx (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPre
     todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
     onPressFn _ = transformState ctx (toggleTodoWithId (unsafeLog2 id))
 
-render :: forall props eff. Render props AppState eff
-render ctx = do
-  (AppState state) <- readState ctx
-  return $ 
-    view [(style "container")] [
-      text [style "title"] "todos",
-      view [style "newTodoContainer"] [
-        textInput [style "newTodo", 
-                   P.value state.newTodo,
-                   P.placeholder "What needs to be done?",
-                   N.onChangeText \newTodo -> transformState ctx (updateNewTodo newTodo),
-                   N.onSubmitEditing \_ -> transformState ctx addTodo]],
-      listView [style "todoList",
-                N.renderRow $ todoRow ctx,
-                N.renderSeparator todoSeparator,
-                N.renderHeader $ view [style "separator"] [],
-                N.dataSource state.dataSource],
-      view [style "bottomBar"] [
-        view [style "filters"] [
-           filterButton ctx state.filter All, 
-           filterButton ctx state.filter Active,
-           filterButton ctx state.filter Completed],
-        text [style "clearCompleted", 
-              N.onPress \_ -> transformState ctx clearCompleted] 
-             "Clear completed"]]
+--render :: forall props eff. Render props AppState eff
+todoList :: forall props eff. T.Spec eff AppState props TodoListAction
+todoList = T.simpleSpec performAction render
+  where 
+    render _ _ _ _ = [view [(style "container")] [text [style "title"] "todos"]]
+    performAction _ _ _ _ = pure unit
+
+-- do
+--   (AppState state) <- readState ctx
+--   return $ 
+--     view [(style "container")] [
+--       text [style "title"] "todos",
+--       view [style "newTodoContainer"] [
+--         textInput [style "newTodo", 
+--                    P.value state.newTodo,
+--                    P.placeholder "What needs to be done?",
+--                    N.onChangeText \newTodo -> transformState ctx (updateNewTodo newTodo),
+--                    N.onSubmitEditing \_ -> transformState ctx addTodo]],
+--       listView [style "todoList",
+--                 N.renderRow $ todoRow ctx,
+--                 N.renderSeparator todoSeparator,
+--                 N.renderHeader $ view [style "separator"] [],
+--                 N.dataSource state.dataSource],
+--       view [style "bottomBar"] [
+--         view [style "filters"] [
+--            filterButton ctx state.filter All, 
+--            filterButton ctx state.filter Active,
+--            filterButton ctx state.filter Completed],
+--         text [style "clearCompleted", 
+--               N.onPress \_ -> transformState ctx clearCompleted] 
+--              "Clear completed"]]
         
 foreign import unsafeLog :: forall p e. p -> Eff e Unit
 foreign import unsafeLog2 :: forall p. p -> p
@@ -250,10 +260,44 @@ main = do
   log "Running app"
   registerComponent "PureScriptSampleApp" component
   where
-    component = createClass $ spec initialState render
+    component = createClass' todoList initialState
     dataSource = listViewDataSource initialTodos
     initialState = updateDataSource $ AppState { nextId: 18, 
                                                  newTodo: "", 
                                                  todos: initialTodos, 
                                                  dataSource: dataSource, 
                                                  filter: All }
+
+-- | Create a React component class from a Thermite component `Spec`.
+createClass' :: forall eff state props action. T.Spec eff state props action -> state -> React.ReactClass props
+createClass' spec state = React.createClass <<< _.spec $ createReactSpec spec state
+
+-- | Create a React component spec from a Thermite component `Spec`.
+-- |
+-- | This function is a low-level alternative to `createClass`, used when the React
+-- | component spec needs to be modified before being turned into a component class,
+-- | e.g. by adding additional lifecycle methods.
+createReactSpec ::
+  forall eff state props action.
+  T.Spec eff state props action ->
+  state ->
+  { spec :: React.ReactSpec props state eff
+  , dispatcher :: React.ReactThis props state -> action -> T.EventHandler
+  }
+createReactSpec (T.Spec spec) state =
+  { spec: React.spec state render
+  , dispatcher: dispatch
+  }
+  where
+  dispatch :: React.ReactThis props state -> action -> T.EventHandler
+  dispatch this action = do
+    props <- React.getProps this
+    state <- React.readState this
+    unsafeInterleaveEff $ spec.performAction action props state (void <<< unsafeInterleaveEff <<< React.writeState this)
+
+  render :: React.Render props state eff
+  render this = map (view []) $
+    spec.render (dispatch this)
+      <$> React.getProps this
+      <*> React.readState this
+      <*> React.getChildren this
