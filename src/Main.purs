@@ -36,7 +36,7 @@ instance eqTodo :: Eq Todo where
 getTodoId :: Todo -> Int
 getTodoId (Todo id _ _) = id
 
-data TodoListAction = TodoListAction
+data TodoListAction = UpdateNewTodo String
   
 data Filter = All | Active | Completed
 instance eqFilter :: Eq Filter where
@@ -220,19 +220,21 @@ todoRow (Todo id item completed) _ _ _ = touchableHighlight [] $ rowView --[N.on
     todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
     -- onPressFn _ = transformState ctx (toggleTodoWithId (unsafeLog2 id))
 
---render :: forall props eff. Render props AppState eff
 todoList :: forall props eff. T.Spec eff AppState props TodoListAction
 todoList = T.simpleSpec performAction render
   where 
-    performAction _ _ _ _ = pure unit
-    render _ _ (AppState state) _ = 
+    performAction :: T.PerformAction eff AppState props TodoListAction
+    performAction (UpdateNewTodo text) _ state k = k $ updateNewTodo text state
+
+    render :: T.Render AppState props TodoListAction
+    render dispatch _ (AppState state) _ = 
       [view [(style "container")] $ [
         text [style "title"] "todos",
         view [style "newTodoContainer"] [
           textInput [style "newTodo", 
                      P.value state.newTodo,
-                     P.placeholder "What needs to be done?"
-                     -- N.onChangeText \newTodo -> transformState ctx (updateNewTodo newTodo),
+                     P.placeholder "What needs to be done?",
+                     N.onChangeText (\text -> dispatch (UpdateNewTodo text))
                      -- N.onSubmitEditing \_ -> transformState ctx addTodo
                      ]],
         listView [style "todoList",
