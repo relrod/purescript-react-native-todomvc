@@ -36,7 +36,12 @@ instance eqTodo :: Eq Todo where
 getTodoId :: Todo -> Int
 getTodoId (Todo id _ _) = id
 
-data TodoListAction = UpdateNewTodo String
+data TodoListAction 
+  = UpdateNewTodo String
+  | AddTodo
+  | ClearCompleted
+  | ToggleTodo Int
+  | FilterTodos Filter
   
 data Filter = All | Active | Completed
 instance eqFilter :: Eq Filter where
@@ -186,7 +191,6 @@ clearCompleted (AppState state) = updateDataSource $ AppState $ state { todos = 
 filterTodos :: Filter -> AppState -> AppState
 filterTodos filter (AppState state) = updateDataSource $ AppState $ state { filter = filter }
 
-
 todoOrdering :: Todo -> Todo -> Ordering
 todoOrdering (Todo _ _ true) (Todo _ _ false) = GT
 todoOrdering (Todo _ _ false) (Todo _ _ true) = LT
@@ -204,28 +208,18 @@ applyFilter Completed (Todo _ _ c) = c
 todoSeparator :: N.RenderSeparatorFn
 todoSeparator sectionId rowId adjacentHighlighted = view [style "separator"] []
           
-filterButton :: forall props. ReactThis props AppState -> Filter -> Filter -> ReactElement
-filterButton ctx activeFilter filter = 
+filterButton :: (TodoListAction -> T.EventHandler) -> Filter -> Filter -> ReactElement
+filterButton dispatch activeFilter filter = 
   view [styles (if activeFilter == filter then ["filter", "activeFilter"] else ["filter"])] [
-    text [N.onPress \_ -> transformState ctx (filterTodos filter)] filterText]
+    text [N.onPress \_ -> dispatch $ FilterTodos filter] filterText]
   where filterText = case filter of 
           All -> "All"
           Active -> "Active"
           Completed -> "Completed"
-
-todoRow :: forall b c d. Todo -> b -> c -> d -> ReactElement
-todoRow (Todo id item completed) _ _ _ = touchableHighlight [] $ rowView --[N.onPress onPressFn] $ rowView
+    
+todoListSpec :: forall props eff. T.Spec eff AppState props TodoListAction
+todoListSpec = T.simpleSpec updateAppState render
   where
-    rowView = view [style "todo"] [todoText]
-    todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
-    -- onPressFn _ = transformState ctx (toggleTodoWithId (unsafeLog2 id))
-
-todoList :: forall props eff. T.Spec eff AppState props TodoListAction
-todoList = T.simpleSpec performAction render
-  where 
-    performAction :: T.PerformAction eff AppState props TodoListAction
-    performAction (UpdateNewTodo text) _ state k = k $ updateNewTodo text state
-
     render :: T.Render AppState props TodoListAction
     render dispatch _ (AppState state) _ = 
       [view [(style "container")] $ [
@@ -234,40 +228,33 @@ todoList = T.simpleSpec performAction render
           textInput [style "newTodo", 
                      P.value state.newTodo,
                      P.placeholder "What needs to be done?",
-                     N.onChangeText (\text -> dispatch (UpdateNewTodo text))
-                     -- N.onSubmitEditing \_ -> transformState ctx addTodo
+                     N.onChangeText \text -> dispatch (UpdateNewTodo text),
+                     N.onSubmitEditing \_ -> dispatch AddTodo
                      ]],
         listView [style "todoList",
-                  N.renderRow todoRow,
+                  N.renderRow $ todoRow dispatch,
                   N.renderSeparator todoSeparator,
                   N.renderHeader $ view [style "separator"] [],
                   N.dataSource state.dataSource],
-        view [style "bottomBar"] [text [style "clearCompleted"] "Clear completed"]]]
-
--- do
---   (AppState state) <- readState ctx
---   return $ 
---     view [(style "container")] [
---       text [style "title"] "todos",
---       view [style "newTodoContainer"] [
---         textInput [style "newTodo", 
---                    P.value state.newTodo,
---                    P.placeholder "What needs to be done?",
---                    N.onChangeText \newTodo -> transformState ctx (updateNewTodo newTodo),
---                    N.onSubmitEditing \_ -> transformState ctx addTodo]],
---       listView [style "todoList",
---                 N.renderRow $ todoRow ctx,
---                 N.renderSeparator todoSeparator,
---                 N.renderHeader $ view [style "separator"] [],
---                 N.dataSource state.dataSource],
---       view [style "bottomBar"] [
---         view [style "filters"] [
---            filterButton ctx state.filter All, 
---            filterButton ctx state.filter Active,
---            filterButton ctx state.filter Completed],
---         text [style "clearCompleted", 
---               N.onPress \_ -> transformState ctx clearCompleted] 
---              "Clear completed"]]
+        view [style "bottomBar"] [
+          view [style "filters"] [
+             filterButton dispatch state.filter All, 
+             filterButton dispatch state.filter Active,
+             filterButton dispatch state.filter Completed],
+          text [style "clearCompleted", N.onPress \_ -> dispatch ClearCompleted] "Clear completed"]]]
+    todoRow :: forall b c d. (TodoListAction -> T.EventHandler) -> Todo -> b -> c -> d -> ReactElement
+    todoRow dispatch (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPressFn] $ rowView
+      where
+        rowView = view [style "todo"] [todoText]
+        todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
+        onPressFn _ = dispatch (ToggleTodo id)
+        
+updateAppState :: forall props eff. T.PerformAction eff AppState props TodoListAction
+updateAppState (UpdateNewTodo text) _ state k = k $ updateNewTodo text state
+updateAppState AddTodo _ state k = k $ addTodo state
+updateAppState ClearCompleted _ state k = k $ clearCompleted state
+updateAppState (ToggleTodo id) _ state k = k $ toggleTodoWithId id state
+updateAppState (FilterTodos filter) _ state k = k $ filterTodos filter state
         
 foreign import unsafeLog :: forall p e. p -> Eff e Unit
 foreign import unsafeLog2 :: forall p. p -> p
@@ -277,7 +264,7 @@ main = do
   log "Running app"
   registerComponent "PureScriptSampleApp" component
   where
-    component = createClass' todoList initialState
+    component = createClass' todoListSpec initialState
     dataSource = listViewDataSource initialTodos
     initialState = updateDataSource $ AppState { nextId: 18, 
                                                  newTodo: "", 
