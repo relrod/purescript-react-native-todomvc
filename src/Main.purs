@@ -162,45 +162,6 @@ style key = S.style $ S.getStyleId appStyleSheet key
 styles :: Array String -> P.Props
 styles keys = S.styles $ map (S.getStyleId appStyleSheet) keys
 
-
-toggleTodoWithId :: Int -> AppState -> AppState
-toggleTodoWithId id (AppState state) = fromMaybe (AppState state) $ do
-  index <- findIndex (((==) id) <<< getTodoId) state.todos
-  newTodos <- modifyAt (unsafeLog2 index) toggleTodo state.todos
-  return $ updateDataSource $ AppState $ state { todos = newTodos }
-  
-toggleTodo :: Todo -> Todo
-toggleTodo (Todo id s complete) = Todo id s (not complete)
-
-addTodo :: AppState -> AppState
-addTodo (AppState state) = updateDataSource $ AppState $ state { nextId = state.nextId + 1, newTodo = "", todos = newTodos }
-  where newTodos = (Todo state.nextId state.newTodo false) : state.todos
-        
-updateNewTodo :: String -> AppState -> AppState
-updateNewTodo newTodo (AppState state) = AppState state { newTodo = newTodo }
-
-clearCompleted :: AppState -> AppState
-clearCompleted (AppState state) = updateDataSource $ AppState $ state { todos = newTodos }
-  where newTodos = filter notCompleted state.todos
-        notCompleted (Todo _ _ completed) = not completed
-        
-filterTodos :: Filter -> AppState -> AppState
-filterTodos filter (AppState state) = updateDataSource $ AppState $ state { filter = filter }
-
-todoOrdering :: Todo -> Todo -> Ordering
-todoOrdering (Todo _ _ true) (Todo _ _ false) = GT
-todoOrdering (Todo _ _ false) (Todo _ _ true) = LT
-todoOrdering (Todo id1 _ _) (Todo id2 _ _) = if id1 < id2 then LT else GT
-
-updateDataSource :: AppState -> AppState
-updateDataSource (AppState state) = AppState $ state { dataSource = cloneWithRows state.dataSource filteredTodos }
-  where filteredTodos = sortBy todoOrdering $ filter (applyFilter state.filter) state.todos
-
-applyFilter :: Filter -> Todo -> Boolean
-applyFilter All _ = true
-applyFilter Active (Todo _ _ c) = not c
-applyFilter Completed (Todo _ _ c) = c
-
 todoSeparator :: N.RenderSeparatorFn
 todoSeparator sectionId rowId adjacentHighlighted = view [style "separator"] []
           
@@ -251,6 +212,44 @@ updateAppState AddTodo _ state k = k $ addTodo state
 updateAppState ClearCompleted _ state k = k $ clearCompleted state
 updateAppState (ToggleTodo id) _ state k = k $ toggleTodoWithId id state
 updateAppState (FilterTodos filter) _ state k = k $ filterTodos filter state
+
+toggleTodoWithId :: Int -> AppState -> AppState
+toggleTodoWithId id (AppState state) = fromMaybe (AppState state) $ do
+  index <- findIndex (((==) id) <<< getTodoId) state.todos
+  newTodos <- modifyAt (unsafeLog2 index) toggleTodo state.todos
+  return $ updateDataSource $ AppState $ state { todos = newTodos }
+
+toggleTodo :: Todo -> Todo
+toggleTodo (Todo id s complete) = Todo id s (not complete)
+
+addTodo :: AppState -> AppState
+addTodo (AppState state) = updateDataSource $ AppState $ state { nextId = state.nextId + 1, newTodo = "", todos = newTodos }
+  where newTodos = (Todo state.nextId state.newTodo false) : state.todos
+        
+updateNewTodo :: String -> AppState -> AppState
+updateNewTodo newTodo (AppState state) = AppState state { newTodo = newTodo }
+
+clearCompleted :: AppState -> AppState
+clearCompleted (AppState state) = updateDataSource $ AppState $ state { todos = newTodos }
+  where newTodos = filter notCompleted state.todos
+        notCompleted (Todo _ _ completed) = not completed
+        
+filterTodos :: Filter -> AppState -> AppState
+filterTodos filter (AppState state) = updateDataSource $ AppState $ state { filter = filter }
+
+todoOrdering :: Todo -> Todo -> Ordering
+todoOrdering (Todo _ _ true) (Todo _ _ false) = GT
+todoOrdering (Todo _ _ false) (Todo _ _ true) = LT
+todoOrdering (Todo id1 _ _) (Todo id2 _ _) = if id1 < id2 then LT else GT
+
+updateDataSource :: AppState -> AppState
+updateDataSource (AppState state) = AppState $ state { dataSource = cloneWithRows state.dataSource filteredTodos }
+  where filteredTodos = sortBy todoOrdering $ filter (applyFilter state.filter) state.todos
+
+applyFilter :: Filter -> Todo -> Boolean
+applyFilter All _ = true
+applyFilter Active (Todo _ _ c) = not c
+applyFilter Completed (Todo _ _ c) = c
         
 foreign import unsafeLog :: forall p e. p -> Eff e Unit
 foreign import unsafeLog2 :: forall p. p -> p
