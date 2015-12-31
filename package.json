@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "start": "node_modules/react-native/packager/packager.sh",
-    "install": "react-native run-android && npm run setup-device",
+    "install-app": "react-native run-android && npm run setup-device",
     "setup-device": "adb -d reverse tcp:8081 tcp:8081",
     "watch": "pulp --watch build --require-path '../'"
   },
   "dependencies": {
+    "purescript": "0.8.0-rc.1",
     "react-native": "^0.17.0",
-    "purescript": "0.8.0-rc.1"
+    "react-native-cli": "^0.1.7"
   },
   "devDependencies": {
     "pulp": "^6.1.0"
