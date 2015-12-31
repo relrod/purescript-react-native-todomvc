@@ -8,3 +8,4 @@ android/build
 psc.tix
 psc-bundle.tix
 android/.gradle
+/.pulp-cache
