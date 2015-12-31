@@ -295,7 +295,7 @@ createReactSpec (T.Spec spec) state =
     unsafeInterleaveEff $ spec.performAction action props state (void <<< unsafeInterleaveEff <<< React.writeState this)
 
   render :: React.Render props state eff
-  render this = map (view []) $
+  render this = map (view [S.style' [S.flex 1.0]]) $
     spec.render (dispatch this)
       <$> React.getProps this
       <*> React.readState this
