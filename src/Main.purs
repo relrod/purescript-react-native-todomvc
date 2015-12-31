@@ -4,10 +4,9 @@ import Prelude
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Console (CONSOLE(), log)
 import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
-import Data.Array ((:), filter, findIndex, modifyAt, sortBy)
+import Data.Array ((:), filter, sortBy)
 import Data.Generic (class Generic, gEq)
-import Data.Maybe (fromMaybe)
-import React (ReactElement())
+import React (ReactElement(), createFactory)
 import ReactNative (registerComponent)
 import ReactNative.Components (ListViewDataSource(), cloneWithRows, listView, listViewDataSource, text, textInput, touchableHighlight, view)
 
@@ -40,7 +39,6 @@ data TodoListAction
   = UpdateNewTodo String
   | AddTodo
   | ClearCompleted
-  | ToggleTodo Int
   | FilterTodos Filter
   
 data Filter = All | Active | Completed
@@ -85,7 +83,7 @@ todoListSpec = T.simpleSpec updateAppState render
                      N.onSubmitEditing \_ -> dispatch AddTodo
                      ]],
         listView [style "todoList",
-                  N.renderRow $ todoRow dispatch,
+                  N.renderRow rowFn,
                   N.renderSeparator todoSeparator,
                   N.renderHeader $ view [style "separator"] [],
                   N.dataSource state.dataSource],
@@ -95,12 +93,23 @@ todoListSpec = T.simpleSpec updateAppState render
              filterButton dispatch state.filter Active,
              filterButton dispatch state.filter Completed],
           text [style "clearCompleted", N.onPress \_ -> dispatch ClearCompleted] "Clear completed"]]]
-    todoRow :: forall b c d. (TodoListAction -> T.EventHandler) -> Todo -> b -> c -> d -> ReactElement
-    todoRow dispatch (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPressFn] $ rowView
-      where
-        rowView = view [style "todo"] [todoText]
-        todoText = text [styles (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])] item
-        onPressFn _ = dispatch (ToggleTodo id)
+
+data TodoAction = ToggleTodo
+
+rowFn :: forall highlightFn. Todo -> String -> String -> highlightFn -> ReactElement
+rowFn todo sectionId rowId highlightRow = 
+  createFactory (createClass' spec todo) todo
+  where
+    spec :: forall eff props. T.Spec eff Todo props TodoAction
+    spec = T.simpleSpec updateTodo render
+    updateTodo :: forall props eff. T.PerformAction eff Todo props TodoAction
+    updateTodo ToggleTodo _ (Todo id item completed) k = k $ Todo id item (not completed)
+    render :: forall props. T.Render Todo props TodoAction
+    render dispatch _ (Todo id item completed) _ = 
+      [touchableHighlight [N.onPress \_ -> dispatch ToggleTodo] $
+        view [style "todo"] [
+          text [styles textStyles] item]]
+      where textStyles = (if completed then ["todoText", "todoTextCompleted"] else ["todoText"])
 
 todoSeparator :: N.RenderSeparatorFn
 todoSeparator sectionId rowId adjacentHighlighted = view [style "separator"] []
@@ -115,44 +124,26 @@ filterButton dispatch activeFilter filter =
           Completed -> "Completed"
         
 updateAppState :: forall props eff. T.PerformAction eff AppState props TodoListAction
-updateAppState (UpdateNewTodo text) _ state k = k $ updateNewTodo text state
-updateAppState AddTodo _ state k = k $ addTodo state
-updateAppState ClearCompleted _ state k = k $ clearCompleted state
-updateAppState (ToggleTodo id) _ state k = k $ toggleTodoWithId id state
-updateAppState (FilterTodos filter) _ state k = k $ filterTodos filter state
+updateAppState action _ state k = k $ updateAppState' state action
 
-toggleTodoWithId :: Int -> AppState -> AppState
-toggleTodoWithId id (AppState state) = fromMaybe (AppState state) $ do
-  index <- findIndex (((==) id) <<< getTodoId) state.todos
-  newTodos <- modifyAt (unsafeLog2 index) toggleTodo state.todos
-  return $ updateDataSource $ AppState $ state { todos = newTodos }
-
-toggleTodo :: Todo -> Todo
-toggleTodo (Todo id s complete) = Todo id s (not complete)
-
-addTodo :: AppState -> AppState
-addTodo (AppState state) = updateDataSource $ AppState $ state { nextId = state.nextId + 1, newTodo = "", todos = newTodos }
-  where newTodos = (Todo state.nextId state.newTodo false) : state.todos
-        
-updateNewTodo :: String -> AppState -> AppState
-updateNewTodo newTodo (AppState state) = AppState state { newTodo = newTodo }
-
-clearCompleted :: AppState -> AppState
-clearCompleted (AppState state) = updateDataSource $ AppState $ state { todos = newTodos }
+updateAppState' :: AppState -> TodoListAction -> AppState
+updateAppState' (AppState state) (UpdateNewTodo text) = AppState state { newTodo = text }
+updateAppState' (AppState state) AddTodo = updateDataSource $ AppState newState
+  where newState = state { nextId = state.nextId + 1, newTodo = "", todos = todos}
+        todos = (Todo state.nextId state.newTodo false) : state.todos
+updateAppState' (AppState state) ClearCompleted  = updateDataSource $ AppState state { todos = newTodos }
   where newTodos = filter notCompleted state.todos
         notCompleted (Todo _ _ completed) = not completed
-        
-filterTodos :: Filter -> AppState -> AppState
-filterTodos filter (AppState state) = updateDataSource $ AppState $ state { filter = filter }
+updateAppState' (AppState state) (FilterTodos filter) = updateDataSource $ AppState state { filter = filter }
+
+updateDataSource :: AppState -> AppState
+updateDataSource (AppState state) = AppState $ state { dataSource = cloneWithRows state.dataSource filteredTodos }
+  where filteredTodos = sortBy todoOrdering $ filter (applyFilter state.filter) state.todos
 
 todoOrdering :: Todo -> Todo -> Ordering
 todoOrdering (Todo _ _ true) (Todo _ _ false) = GT
 todoOrdering (Todo _ _ false) (Todo _ _ true) = LT
 todoOrdering (Todo id1 _ _) (Todo id2 _ _) = if id1 < id2 then LT else GT
-
-updateDataSource :: AppState -> AppState
-updateDataSource (AppState state) = AppState $ state { dataSource = cloneWithRows state.dataSource filteredTodos }
-  where filteredTodos = sortBy todoOrdering $ filter (applyFilter state.filter) state.todos
 
 applyFilter :: Filter -> Todo -> Boolean
 applyFilter All _ = true
