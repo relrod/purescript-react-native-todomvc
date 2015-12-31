@@ -268,15 +268,14 @@ main = do
                                                  dataSource: dataSource, 
                                                  filter: All }
 
--- | Create a React component class from a Thermite component `Spec`.
+
+-- Copied from Thermite project because Thermite uses divs when generating
+-- the UI but we need views. This also requires one tiny change to Thermite
+-- to expose the T.Spec data constructor.
+
 createClass' :: forall eff state props action. T.Spec eff state props action -> state -> React.ReactClass props
 createClass' spec state = React.createClass <<< _.spec $ createReactSpec spec state
 
--- | Create a React component spec from a Thermite component `Spec`.
--- |
--- | This function is a low-level alternative to `createClass`, used when the React
--- | component spec needs to be modified before being turned into a component class,
--- | e.g. by adding additional lifecycle methods.
 createReactSpec ::
   forall eff state props action.
   T.Spec eff state props action ->
