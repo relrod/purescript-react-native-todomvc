@@ -5,16 +5,16 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Console (CONSOLE(), log)
 import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)
 import Data.Array ((:), filter, findIndex, modifyAt, sortBy)
-import Data.Generic (Generic, gEq)
+import Data.Generic (class Generic, gEq)
 import Data.Maybe (fromMaybe)
 import React (ReactElement())
 import ReactNative (registerComponent)
 import ReactNative.Components (ListViewDataSource(), cloneWithRows, listView, listViewDataSource, text, textInput, touchableHighlight, view)
 
-import qualified ReactNative.Props as N
-import qualified React.DOM.Props as P
-import qualified ReactNative.Styles as S
-import qualified Thermite as T
+import ReactNative.Props as N
+import React.DOM.Props as P
+import ReactNative.Styles as S
+import Thermite as T
 
 data AppState = AppState {
   nextId :: Int, 
