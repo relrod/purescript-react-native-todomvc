@@ -16,7 +16,7 @@
   "dependencies": {
     "purescript-console": "^1.0.0",
     "purescript-react": "~1.1.0",
-    "purescript-react-native": "git://github.com/relrod/purescript-react-native#61563f1e43cf26d43ca1cfaa56aa3d1230406ea3",
+    "purescript-react-native": "git://github.com/relrod/purescript-react-native",
     "purescript-arrays": "~1.1.0",
     "purescript-integers": "~1.1.0",
     "purescript-maybe": "~1.0.0",
