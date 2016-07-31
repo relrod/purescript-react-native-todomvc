@@ -4,7 +4,7 @@ import Prelude
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Console (CONSOLE(), log)
 import Data.Array ((:), concat, filter, findIndex, length, modifyAt, range, sortBy, zip)
-import Data.Generic (Generic, gEq)
+import Data.Generic
 import Data.Int (fromString)
 import Data.Maybe (Maybe(), fromMaybe)
 import Data.Tuple (fst, snd)
@@ -12,9 +12,9 @@ import React (ReactElement(), ReactThis(), Render(), createClass, readState, spe
 import ReactNative (registerComponent)
 import ReactNative.Components (ListViewDataSource(), cloneWithRows, listView, listViewDataSource, text, textInput, touchableHighlight, view)
 
-import qualified ReactNative.Props as N
-import qualified React.DOM.Props as P
-import qualified ReactNative.Styles as S
+import ReactNative.Props as N
+import React.DOM.Props as P
+import ReactNative.Styles as S
 
 data AppState = AppState {
   nextId :: Int, 
@@ -156,7 +156,7 @@ toggleTodoWithId :: Int -> AppState -> AppState
 toggleTodoWithId id (AppState state) = fromMaybe (AppState state) $ do
   index <- findIndex (((==) id) <<< getTodoId) state.todos
   newTodos <- modifyAt (unsafeLog2 index) toggleTodo state.todos
-  return $ updateDataSource $ AppState $ state { todos = newTodos }
+  pure $ updateDataSource $ AppState $ state { todos = newTodos }
   
 toggleTodo :: Todo -> Todo
 toggleTodo (Todo id s complete) = Todo id s (not complete)
@@ -212,9 +212,9 @@ todoRow ctx (Todo id item completed) _ _ _ = touchableHighlight [N.onPress onPre
 render :: forall props eff. Render props AppState eff
 render ctx = do
   (AppState state) <- readState ctx
-  return $ 
+  pure $ 
     view [(style "container")] [
-      text [style "title"] "todos",
+      text [style "title"] "THINGS",
       view [style "newTodoContainer"] [
         textInput [style "newTodo", 
                    P.value state.newTodo,
